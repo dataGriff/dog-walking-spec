@@ -1,4 +1,4 @@
-apiVersion: v3.2.0
+apiVersion: v3.1.0
 kind: DataContract
 id: walks-events-history
 name: Walk events history
@@ -24,43 +24,47 @@ description:
     within minutes but ordering across event types is only guaranteed per
     walk_id.
 
-# What a reader - human or agent - needs to know before querying this
-# record. Same authority as the rest of the contract: it is versioned and
-# gated, not advice bolted on afterwards.
-context:
-  instructions: >
-    This is the event history of the Walk aggregate, one row per event,
-    never updated in place. Count walks from walk_scheduled_events and
-    treat walk_completed_events and walk_cancelled_events as separate
-    facts joined on walk_id; a walk appears in exactly one of the latter
-    two once it is closed, and in neither while it is still open. Every
-    row carries the walker_id it belongs to - always filter by it.
-  verifiedStatements:
-    - question: How many walks did a walker complete in a given week?
-      answer: >
-        Count rows in walk_completed_events where walker_id is the walker
-        and completed_at falls in the week. The table is deduplicated on
-        event_id, so no DISTINCT is needed.
-    - question: How many minutes has a dog been walked?
-      answer: >
-        Unnest dog_ids on walk_completed_events, filter to the dog, and
-        sum duration_minutes. A walk with several dogs counts its full
-        duration for each of them.
-    - question: Why do walks get cancelled?
-      answer: >
-        Group walk_cancelled_events by reason. reason is a closed
-        vocabulary of four values.
-  constraints:
-    - constraint: >
-        Never present this as current walk state. A walk cancelled after
-        the last event you read still reads as scheduled here; the walks
-        service API is the source for current state.
-    - constraint: >
-        Never treat a missing walk_completed_events row as proof a walk
-        did not happen - it only means no completion event has landed.
-    - constraint: >
-        Never combine walkers. Every table carries walker_id and every
-        query filters by it; the record is one walker's business.
+# Reader context (ODCS 3.2 `context:` - instructions, verifiedStatements,
+# constraints) is held here until the toolchain pin lints ODCS 3.2:
+# sysspec 0.1.1 runs datacontract-cli 1.1.1, which rejects `context`.
+# Uncomment it, and move apiVersion to v3.2.0, with that bump.
+# # What a reader - human or agent - needs to know before querying this
+# # record. Same authority as the rest of the contract: it is versioned and
+# # gated, not advice bolted on afterwards.
+# context:
+#   instructions: >
+#     This is the event history of the Walk aggregate, one row per event,
+#     never updated in place. Count walks from walk_scheduled_events and
+#     treat walk_completed_events and walk_cancelled_events as separate
+#     facts joined on walk_id; a walk appears in exactly one of the latter
+#     two once it is closed, and in neither while it is still open. Every
+#     row carries the walker_id it belongs to - always filter by it.
+#   verifiedStatements:
+#     - question: How many walks did a walker complete in a given week?
+#       answer: >
+#         Count rows in walk_completed_events where walker_id is the walker
+#         and completed_at falls in the week. The table is deduplicated on
+#         event_id, so no DISTINCT is needed.
+#     - question: How many minutes has a dog been walked?
+#       answer: >
+#         Unnest dog_ids on walk_completed_events, filter to the dog, and
+#         sum duration_minutes. A walk with several dogs counts its full
+#         duration for each of them.
+#     - question: Why do walks get cancelled?
+#       answer: >
+#         Group walk_cancelled_events by reason. reason is a closed
+#         vocabulary of four values.
+#   constraints:
+#     - constraint: >
+#         Never present this as current walk state. A walk cancelled after
+#         the last event you read still reads as scheduled here; the walks
+#         service API is the source for current state.
+#     - constraint: >
+#         Never treat a missing walk_completed_events row as proof a walk
+#         did not happen - it only means no completion event has landed.
+#     - constraint: >
+#         Never combine walkers. Every table carries walker_id and every
+#         query filters by it; the record is one walker's business.
 
 schema:
   # `id` is what a fully qualified reference resolves against, so the
@@ -273,37 +277,33 @@ schema:
         logicalType: string
         physicalType: text
         required: true
-        description: Why the walk was cancelled - a closed vocabulary.
-        enum:
-          - value: client_request
-            label: Client request
-            description: The client asked for the walk to be cancelled.
-          - value: walker_unavailable
-            label: Walker unavailable
-            description: The walker could not make the walk.
-          - value: bad_weather
-            label: Bad weather
-            description: The weather made the walk unsafe or unpleasant.
-          - value: dog_unwell
-            label: Dog unwell
-            description: One of the dogs was not well enough to walk.
+        description: >
+          Why the walk was cancelled - a closed vocabulary: client_request
+          (the client asked for the walk to be cancelled), walker_unavailable
+          (the walker could not make the walk), bad_weather (the weather made
+          the walk unsafe or unpleasant), dog_unwell (one of the dogs was not
+          well enough to walk).
+        # The same four values the AsyncAPI payload enumerates. Declared as
+        # a validValues quality rule - the ODCS 3.1 shape - because the
+        # toolchain pin (sysspec 0.1.1 -> datacontract-cli 1.1.1) does not
+        # yet lint ODCS 3.2; move to a first-class `enum` with labels once it
+        # does. The intent gate reads either shape as the vocabulary.
         quality:
-          - metric: invalidValues
+          - rule: validValues
             description: Every reason is one of the declared values.
             dimension: conformity
-            mustBe: 0
+            validValues: [client_request, walker_unavailable, bad_weather, dog_unwell]
 
 slaProperties:
   - property: latency
     value: 15
     unit: m
 
+# ODCS 3.1 shape (a list of members); becomes the 3.2 team object with the
+# apiVersion bump noted above.
 team:
-  name: Dog Walking
-  description: Owns the Walk aggregate and everything published from it.
-  members:
-    - username: datagriff
-      role: owner
+  - username: datagriff
+    role: owner
 
 support:
   - channel: dataGriff/dog-walking-spec

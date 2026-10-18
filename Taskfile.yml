@@ -4,6 +4,13 @@ vars:
   # The machinery pin - Renovate bumps this (npm datasource).
   SYSSPEC: sysspec@0.1.1
 
+env:
+  # The AsyncAPI CLI prints its metrics-upload status to stdout when the
+  # upload fails (offline, sandboxed), which breaks the JSON the intent gate
+  # parses. Pointing it at the committed opt-out keeps the gate
+  # deterministic wherever it runs.
+  ASYNCAPI_METRICS_CONFIG_PATH: "{{.ROOT_DIR}}/.asyncapi-analytics"
+
 tasks:
   ci:
     desc: Full verification - identical locally and in CI
