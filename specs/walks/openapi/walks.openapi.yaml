@@ -1,0 +1,368 @@
+openapi: 3.1.0
+info:
+  title: Walks API
+  version: 1.0.0
+  description: >
+    Scheduling and lifecycle of walks. A walk is booked for one or more of
+    the signed-in walker's dogs, then started, completed or cancelled.
+    Every operation acts on behalf of the signed-in walker and only ever
+    sees that walker's walks.
+  contact:
+    name: datagriff
+
+tags:
+  - name: walks
+    description: Scheduling, finding and progressing walks.
+
+security:
+  - bearer_auth: []
+
+paths:
+  /walks:
+    get:
+      operationId: listWalks
+      summary: List walks
+      description: >
+        The walker's walks, soonest first, optionally limited to a window of
+        scheduled times and to one status.
+      tags: [walks]
+      parameters:
+        - name: scheduled_from
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+          description: Only walks scheduled at or after this instant.
+        - name: scheduled_to
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+          description: Only walks scheduled before this instant.
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [scheduled, in_progress, completed, cancelled]
+          description: Only walks in this status.
+      responses:
+        '200':
+          description: The matching walks.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WalkList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+    post:
+      operationId: scheduleWalk
+      summary: Schedule a walk
+      description: >
+        Books a walk for the given dogs. On success the walk is persisted
+        and a WalkScheduled event is guaranteed to be published - never one
+        without the other.
+      tags: [walks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScheduleWalkRequest'
+      responses:
+        '201':
+          description: Walk scheduled; a WalkScheduled event will be published.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Walk'
+        '400':
+          description: >
+            Invalid walk - no dog_ids, a dog_id that is not one of the
+            walker's dogs, or a duration_minutes below 1.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+
+  /walks/{walk_id}:
+    parameters:
+      - name: walk_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getWalk
+      summary: Fetch a walk
+      description: Returns the walk's current state by its id.
+      tags: [walks]
+      responses:
+        '200':
+          description: The walk.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Walk'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/WalkNotFound'
+    patch:
+      operationId: updateWalk
+      summary: Reschedule or amend a walk
+      description: >
+        Changes the given fields of a walk that is still scheduled; fields
+        left out are unchanged. A walk that has started, completed or been
+        cancelled cannot be amended.
+      tags: [walks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateWalkRequest'
+      responses:
+        '200':
+          description: The updated walk.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Walk'
+        '400':
+          description: >
+            Invalid update - no dog_ids, a dog_id that is not one of the
+            walker's dogs, or a duration_minutes below 1.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/WalkNotFound'
+        '409':
+          description: The walk is no longer scheduled, so it cannot be amended.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /walks/{walk_id}/start:
+    parameters:
+      - name: walk_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: startWalk
+      summary: Start a walk
+      description: Marks a scheduled walk as in progress and records started_at.
+      tags: [walks]
+      responses:
+        '200':
+          description: The walk is in progress.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Walk'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/WalkNotFound'
+        '409':
+          description: Only a scheduled walk can be started.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /walks/{walk_id}/complete:
+    parameters:
+      - name: walk_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: completeWalk
+      summary: Complete a walk
+      description: >
+        Marks a scheduled or in-progress walk as completed, records
+        completed_at, and guarantees a WalkCompleted event.
+      tags: [walks]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteWalkRequest'
+      responses:
+        '200':
+          description: The walk is completed; a WalkCompleted event will be published.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Walk'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/WalkNotFound'
+        '409':
+          description: A completed or cancelled walk cannot be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /walks/{walk_id}/cancel:
+    parameters:
+      - name: walk_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      operationId: cancelWalk
+      summary: Cancel a walk
+      description: >
+        Cancels a scheduled or in-progress walk for a declared reason,
+        records cancelled_at, and guarantees a WalkCancelled event.
+      tags: [walks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelWalkRequest'
+      responses:
+        '200':
+          description: The walk is cancelled; a WalkCancelled event will be published.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Walk'
+        '400':
+          description: The reason is not one of the declared reasons.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/WalkNotFound'
+        '409':
+          description: A completed or cancelled walk cannot be cancelled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+components:
+  securitySchemes:
+    bearer_auth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        The signed-in walker's session token. Every walk is scoped to the
+        walker the token identifies; a request without a valid token is a 401.
+
+  responses:
+    Unauthenticated:
+      description: No valid session token was presented.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    WalkNotFound:
+      description: No such walk for this walker.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+  schemas:
+    Problem:
+      type: object
+      required: [error_code, message]
+      additionalProperties: false
+      properties:
+        error_code:
+          type: string
+          description: Machine-readable reason, lower_snake_case (e.g. invalid_walk, walk_not_found, walk_not_scheduled, walk_already_closed, unauthenticated).
+        message:
+          type: string
+          description: Human-readable explanation of the failure.
+
+    Walk:
+      type: object
+      required: [walk_id, scheduled_at, duration_minutes, dog_ids, status, created_at]
+      additionalProperties: false
+      properties:
+        walk_id: { type: string, format: uuid }
+        scheduled_at: { type: string, format: date-time }
+        duration_minutes: { type: integer, minimum: 1 }
+        dog_ids:
+          type: array
+          minItems: 1
+          items: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [scheduled, in_progress, completed, cancelled]
+        notes: { type: string }
+        started_at: { type: string, format: date-time }
+        completed_at: { type: string, format: date-time }
+        cancelled_at: { type: string, format: date-time }
+        cancellation_reason:
+          type: string
+          enum: [client_request, walker_unavailable, bad_weather, dog_unwell]
+        created_at: { type: string, format: date-time }
+
+    WalkList:
+      type: object
+      required: [walks]
+      additionalProperties: false
+      properties:
+        walks:
+          type: array
+          items:
+            $ref: '#/components/schemas/Walk'
+
+    ScheduleWalkRequest:
+      type: object
+      required: [scheduled_at, duration_minutes, dog_ids]
+      additionalProperties: false
+      properties:
+        scheduled_at: { type: string, format: date-time }
+        duration_minutes: { type: integer, minimum: 1 }
+        dog_ids:
+          type: array
+          minItems: 1
+          items: { type: string, format: uuid }
+        notes: { type: string }
+
+    UpdateWalkRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        scheduled_at: { type: string, format: date-time }
+        duration_minutes: { type: integer, minimum: 1 }
+        dog_ids:
+          type: array
+          minItems: 1
+          items: { type: string, format: uuid }
+        notes: { type: string }
+
+    CompleteWalkRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        notes: { type: string }
+
+    CancelWalkRequest:
+      type: object
+      required: [reason]
+      additionalProperties: false
+      properties:
+        reason:
+          type: string
+          enum: [client_request, walker_unavailable, bad_weather, dog_unwell]

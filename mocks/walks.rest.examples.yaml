@@ -1,0 +1,174 @@
+apiVersion: mocks.microcks.io/v1alpha1
+kind: APIExamples
+metadata:
+  name: Walks API
+  version: 1.0.0
+operations:
+  'GET /walks':
+    upcoming:
+      response:
+        status: "200"
+        mediaType: application/json
+        body: |-
+          {
+            "walks": [
+              {
+                "walk_id": "33333333-3333-4333-8333-333333333333",
+                "scheduled_at": "2026-11-02T09:00:00Z",
+                "duration_minutes": 45,
+                "dog_ids": ["22222222-2222-4222-8222-222222222222"],
+                "status": "scheduled",
+                "notes": "Meet at the park gate",
+                "created_at": "2026-10-20T18:00:00Z"
+              }
+            ]
+          }
+  'POST /walks':
+    scheduled:
+      request:
+        headers:
+          Content-Type: application/json
+        body: |-
+          {
+            "scheduled_at": "2026-11-02T09:00:00Z",
+            "duration_minutes": 45,
+            "dog_ids": ["22222222-2222-4222-8222-222222222222"],
+            "notes": "Meet at the park gate"
+          }
+      response:
+        status: "201"
+        mediaType: application/json
+        body: |-
+          {
+            "walk_id": "33333333-3333-4333-8333-333333333333",
+            "scheduled_at": "2026-11-02T09:00:00Z",
+            "duration_minutes": 45,
+            "dog_ids": ["22222222-2222-4222-8222-222222222222"],
+            "status": "scheduled",
+            "notes": "Meet at the park gate",
+            "created_at": "2026-10-20T18:00:00Z"
+          }
+  'GET /walks/{walk_id}':
+    scheduled:
+      request:
+        parameters:
+          walk_id: 33333333-3333-4333-8333-333333333333
+      response:
+        status: "200"
+        mediaType: application/json
+        body: |-
+          {
+            "walk_id": "33333333-3333-4333-8333-333333333333",
+            "scheduled_at": "2026-11-02T09:00:00Z",
+            "duration_minutes": 45,
+            "dog_ids": ["22222222-2222-4222-8222-222222222222"],
+            "status": "scheduled",
+            "notes": "Meet at the park gate",
+            "created_at": "2026-10-20T18:00:00Z"
+          }
+    not_found:
+      request:
+        parameters:
+          walk_id: 99999999-9999-4999-8999-999999999999
+      response:
+        status: "404"
+        mediaType: application/json
+        body: |-
+          {
+            "error_code": "walk_not_found",
+            "message": "No walk 99999999-9999-4999-8999-999999999999"
+          }
+  'PATCH /walks/{walk_id}':
+    rescheduled:
+      request:
+        parameters:
+          walk_id: 33333333-3333-4333-8333-333333333333
+        headers:
+          Content-Type: application/json
+        body: |-
+          {
+            "scheduled_at": "2026-11-02T10:00:00Z",
+            "duration_minutes": 60
+          }
+      response:
+        status: "200"
+        mediaType: application/json
+        body: |-
+          {
+            "walk_id": "33333333-3333-4333-8333-333333333333",
+            "scheduled_at": "2026-11-02T10:00:00Z",
+            "duration_minutes": 60,
+            "dog_ids": ["22222222-2222-4222-8222-222222222222"],
+            "status": "scheduled",
+            "notes": "Meet at the park gate",
+            "created_at": "2026-10-20T18:00:00Z"
+          }
+  'POST /walks/{walk_id}/start':
+    started:
+      request:
+        parameters:
+          walk_id: 44444444-4444-4444-8444-444444444444
+      response:
+        status: "200"
+        mediaType: application/json
+        body: |-
+          {
+            "walk_id": "44444444-4444-4444-8444-444444444444",
+            "scheduled_at": "2026-11-03T09:00:00Z",
+            "duration_minutes": 30,
+            "dog_ids": ["22222222-2222-4222-8222-222222222222"],
+            "status": "in_progress",
+            "started_at": "2026-11-03T09:02:00Z",
+            "created_at": "2026-10-20T18:05:00Z"
+          }
+  'POST /walks/{walk_id}/complete':
+    completed:
+      request:
+        parameters:
+          walk_id: 55555555-5555-4555-8555-555555555555
+        headers:
+          Content-Type: application/json
+        body: |-
+          {
+            "notes": "Biscuit found a stick"
+          }
+      response:
+        status: "200"
+        mediaType: application/json
+        body: |-
+          {
+            "walk_id": "55555555-5555-4555-8555-555555555555",
+            "scheduled_at": "2026-11-04T09:00:00Z",
+            "duration_minutes": 30,
+            "dog_ids": ["22222222-2222-4222-8222-222222222222"],
+            "status": "completed",
+            "notes": "Biscuit found a stick",
+            "started_at": "2026-11-04T09:01:00Z",
+            "completed_at": "2026-11-04T09:33:00Z",
+            "created_at": "2026-10-20T18:10:00Z"
+          }
+  'POST /walks/{walk_id}/cancel':
+    cancelled:
+      request:
+        parameters:
+          walk_id: 66666666-6666-4666-8666-666666666666
+        headers:
+          Content-Type: application/json
+        body: |-
+          {
+            "reason": "bad_weather"
+          }
+      response:
+        status: "200"
+        mediaType: application/json
+        body: |-
+          {
+            "walk_id": "66666666-6666-4666-8666-666666666666",
+            "scheduled_at": "2026-11-05T09:00:00Z",
+            "duration_minutes": 30,
+            "dog_ids": ["22222222-2222-4222-8222-222222222222"],
+            "status": "cancelled",
+            "cancelled_at": "2026-11-05T07:30:00Z",
+            "cancellation_reason": "bad_weather",
+            "created_at": "2026-10-20T18:15:00Z"
+          }

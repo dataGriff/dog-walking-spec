@@ -1,0 +1,151 @@
+asyncapi: 3.0.0
+info:
+  title: Walks
+  version: 1.0.0
+  description: >
+    Events emitted by the Walk aggregate as CloudEvents 1.0 structured
+    envelopes. Consumers must not assume ordering across channels, only
+    within a partition key of the walk_id, and must dedupe on the
+    envelope id.
+  contact:
+    name: datagriff
+    url: https://github.com/dataGriff/dog-walking-spec
+    email: datagriff@users.noreply.github.com
+  tags:
+    - name: walks
+
+defaultContentType: application/cloudevents+json
+
+channels:
+  walkScheduled:
+    address: walks.scheduled.v1
+    bindings:
+      ws: {}
+    messages:
+      WalkScheduled:
+        $ref: '#/components/messages/WalkScheduled'
+  walkCompleted:
+    address: walks.completed.v1
+    bindings:
+      ws: {}
+    messages:
+      WalkCompleted:
+        $ref: '#/components/messages/WalkCompleted'
+  walkCancelled:
+    address: walks.cancelled.v1
+    bindings:
+      ws: {}
+    messages:
+      WalkCancelled:
+        $ref: '#/components/messages/WalkCancelled'
+
+operations:
+  publishWalkScheduled:
+    action: send
+    description: Emitted when a walk is scheduled and persisted.
+    channel:
+      $ref: '#/channels/walkScheduled'
+    messages:
+      - $ref: '#/channels/walkScheduled/messages/WalkScheduled'
+  publishWalkCompleted:
+    action: send
+    description: Emitted when a walk is completed.
+    channel:
+      $ref: '#/channels/walkCompleted'
+    messages:
+      - $ref: '#/channels/walkCompleted/messages/WalkCompleted'
+  publishWalkCancelled:
+    action: send
+    description: Emitted when a walk is cancelled, with the reason.
+    channel:
+      $ref: '#/channels/walkCancelled'
+    messages:
+      - $ref: '#/channels/walkCancelled/messages/WalkCancelled'
+
+components:
+  messages:
+    WalkScheduled:
+      name: WalkScheduled
+      title: Walk scheduled
+      payload:
+        type: object
+        required: [specversion, id, source, type, time, datacontenttype, data, subject]
+        additionalProperties: false
+        properties:
+          specversion: { type: string, const: '1.0' }
+          id: { type: string, format: uuid }
+          source: { type: string, const: /walks }
+          type: { type: string, const: com.hungovercoders.walks.scheduled.v1 }
+          subject: { type: string, format: uuid }
+          time: { type: string, format: date-time }
+          datacontenttype: { type: string, const: application/json }
+          data:
+            type: object
+            required: [walk_id, walker_id, scheduled_at, duration_minutes, dog_ids]
+            additionalProperties: false
+            properties:
+              walk_id: { type: string, format: uuid }
+              walker_id: { type: string }
+              scheduled_at: { type: string, format: date-time }
+              duration_minutes: { type: integer, minimum: 1 }
+              dog_ids:
+                type: array
+                minItems: 1
+                items: { type: string, format: uuid }
+    WalkCompleted:
+      name: WalkCompleted
+      title: Walk completed
+      payload:
+        type: object
+        required: [specversion, id, source, type, time, datacontenttype, data, subject]
+        additionalProperties: false
+        properties:
+          specversion: { type: string, const: '1.0' }
+          id: { type: string, format: uuid }
+          source: { type: string, const: /walks }
+          type: { type: string, const: com.hungovercoders.walks.completed.v1 }
+          subject: { type: string, format: uuid }
+          time: { type: string, format: date-time }
+          datacontenttype: { type: string, const: application/json }
+          data:
+            type: object
+            required: [walk_id, walker_id, scheduled_at, completed_at, duration_minutes, dog_ids]
+            additionalProperties: false
+            properties:
+              walk_id: { type: string, format: uuid }
+              walker_id: { type: string }
+              scheduled_at: { type: string, format: date-time }
+              started_at: { type: string, format: date-time }
+              completed_at: { type: string, format: date-time }
+              duration_minutes: { type: integer, minimum: 1 }
+              dog_ids:
+                type: array
+                minItems: 1
+                items: { type: string, format: uuid }
+    WalkCancelled:
+      name: WalkCancelled
+      title: Walk cancelled
+      payload:
+        type: object
+        required: [specversion, id, source, type, time, datacontenttype, data, subject]
+        additionalProperties: false
+        properties:
+          specversion: { type: string, const: '1.0' }
+          id: { type: string, format: uuid }
+          source: { type: string, const: /walks }
+          type: { type: string, const: com.hungovercoders.walks.cancelled.v1 }
+          subject: { type: string, format: uuid }
+          time: { type: string, format: date-time }
+          datacontenttype: { type: string, const: application/json }
+          data:
+            type: object
+            required: [walk_id, walker_id, scheduled_at, cancelled_at, reason]
+            additionalProperties: false
+            properties:
+              walk_id: { type: string, format: uuid }
+              walker_id: { type: string }
+              scheduled_at: { type: string, format: date-time }
+              cancelled_at: { type: string, format: date-time }
+              reason:
+                type: string
+                enum: [client_request, walker_unavailable, bad_weather, dog_unwell]

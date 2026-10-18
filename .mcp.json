@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "sysspec": {
+      "command": "npx",
+      "args": ["-y", "sysspec-mcp@1.0.1"],
+      "env": {
+        "SPECS_DIR": "specs"
+      }
+    }
+  }
+}

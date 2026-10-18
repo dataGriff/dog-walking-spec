@@ -1,0 +1,311 @@
+apiVersion: v3.2.0
+kind: DataContract
+id: walks-events-history
+name: Walk events history
+version: 1.0.0
+status: active
+domain: Pet Care
+tenant: hungovercoders
+description:
+  purpose: >
+    Append-only historical record of the Walk aggregate's events. One row
+    per event, mirroring the AsyncAPI payloads on walks.scheduled.v1,
+    walks.completed.v1 and walks.cancelled.v1 field for field - the stream
+    is ephemeral, this table is the record.
+  usage: >
+    Walk history and workload analytics for the walker (walks per week,
+    minutes walked per dog, cancellation reasons), audit, and
+    replay/backfill for downstream consumers that joined after the fact.
+    Not a source for a walk's current state - use the walks service API
+    for that.
+  limitations: >
+    Delivery upstream is at-least-once; rows are deduplicated on the
+    CloudEvents envelope id, so exactly one row per event. Events land
+    within minutes but ordering across event types is only guaranteed per
+    walk_id.
+
+# What a reader - human or agent - needs to know before querying this
+# record. Same authority as the rest of the contract: it is versioned and
+# gated, not advice bolted on afterwards.
+context:
+  instructions: >
+    This is the event history of the Walk aggregate, one row per event,
+    never updated in place. Count walks from walk_scheduled_events and
+    treat walk_completed_events and walk_cancelled_events as separate
+    facts joined on walk_id; a walk appears in exactly one of the latter
+    two once it is closed, and in neither while it is still open. Every
+    row carries the walker_id it belongs to - always filter by it.
+  verifiedStatements:
+    - question: How many walks did a walker complete in a given week?
+      answer: >
+        Count rows in walk_completed_events where walker_id is the walker
+        and completed_at falls in the week. The table is deduplicated on
+        event_id, so no DISTINCT is needed.
+    - question: How many minutes has a dog been walked?
+      answer: >
+        Unnest dog_ids on walk_completed_events, filter to the dog, and
+        sum duration_minutes. A walk with several dogs counts its full
+        duration for each of them.
+    - question: Why do walks get cancelled?
+      answer: >
+        Group walk_cancelled_events by reason. reason is a closed
+        vocabulary of four values.
+  constraints:
+    - constraint: >
+        Never present this as current walk state. A walk cancelled after
+        the last event you read still reads as scheduled here; the walks
+        service API is the source for current state.
+    - constraint: >
+        Never treat a missing walk_completed_events row as proof a walk
+        did not happen - it only means no completion event has landed.
+    - constraint: >
+        Never combine walkers. Every table carries walker_id and every
+        query filters by it; the record is one walker's business.
+
+schema:
+  # `id` is what a fully qualified reference resolves against, so the
+  # elements other contracts point at carry one; the rest do not need it.
+  - id: walk_scheduled_events
+    name: walk_scheduled_events
+    logicalType: object
+    physicalName: walk_scheduled_events
+    physicalType: table
+    description: One row per WalkScheduled event on walks.scheduled.v1.
+    properties:
+      - name: event_id
+        logicalType: string
+        physicalType: uuid
+        required: true
+        unique: true
+        primaryKey: true
+        description: CloudEvents envelope id - the dedupe key.
+      - name: event_type
+        logicalType: string
+        physicalType: text
+        required: true
+        description: CloudEvents type, e.g. com.hungovercoders.walks.scheduled.v1.
+      - name: event_source
+        logicalType: string
+        physicalType: text
+        required: true
+        description: CloudEvents source of the producing service.
+      - name: event_time
+        logicalType: date
+        physicalType: timestamp
+        required: true
+        description: CloudEvents envelope time.
+      - id: walk_id
+        name: walk_id
+        logicalType: string
+        physicalType: uuid
+        required: true
+        unique: true
+      - name: walker_id
+        logicalType: string
+        physicalType: text
+        required: true
+        semanticType: dimension
+        description: The walker the walk belongs to, as the identity provider names them.
+      - name: scheduled_at
+        logicalType: date
+        physicalType: timestamp
+        required: true
+        partitioned: true
+        semanticType: dimension
+        synonyms:
+          - synonym: walk date
+      - name: duration_minutes
+        logicalType: integer
+        physicalType: integer
+        required: true
+        description: Planned length of the walk in whole minutes.
+        synonyms:
+          - synonym: walk length
+        quality:
+          - type: sql
+            description: Walks are never planned for less than a minute.
+            dimension: conformity
+            query: SELECT COUNT(*) FROM walk_scheduled_events WHERE duration_minutes < 1
+            mustBe: 0
+      - name: dog_ids
+        logicalType: array
+        physicalType: json
+        required: true
+        description: The dogs booked on the walk - one or more dog ids.
+        items:
+          logicalType: string
+          physicalType: uuid
+
+  - name: walk_completed_events
+    logicalType: object
+    physicalName: walk_completed_events
+    physicalType: table
+    description: One row per WalkCompleted event on walks.completed.v1.
+    # Declared, not inferred: a completion always refers to a walk this
+    # record already carries. The catalog draws the ER edge from this.
+    relationships:
+      - id: completion_of_walk
+        from: walk_completed_events.walk_id
+        to: walk_scheduled_events.walk_id
+    properties:
+      - name: event_id
+        logicalType: string
+        physicalType: uuid
+        required: true
+        unique: true
+        primaryKey: true
+        description: CloudEvents envelope id - the dedupe key.
+      - name: event_type
+        logicalType: string
+        physicalType: text
+        required: true
+        description: CloudEvents type, e.g. com.hungovercoders.walks.completed.v1.
+      - name: event_source
+        logicalType: string
+        physicalType: text
+        required: true
+        description: CloudEvents source of the producing service.
+      - name: event_time
+        logicalType: date
+        physicalType: timestamp
+        required: true
+        description: CloudEvents envelope time.
+      - name: walk_id
+        logicalType: string
+        physicalType: uuid
+        required: true
+        unique: true
+      - name: walker_id
+        logicalType: string
+        physicalType: text
+        required: true
+        semanticType: dimension
+        description: The walker the walk belongs to, as the identity provider names them.
+      - name: scheduled_at
+        logicalType: date
+        physicalType: timestamp
+        required: true
+        semanticType: dimension
+        description: When the walk was booked for, as it stood at completion.
+      - name: started_at
+        logicalType: date
+        physicalType: timestamp
+        required: false
+        description: When the walker started the walk, if they marked it started before completing it.
+      - name: completed_at
+        logicalType: date
+        physicalType: timestamp
+        required: true
+        partitioned: true
+        semanticType: dimension
+      - name: duration_minutes
+        logicalType: integer
+        physicalType: integer
+        required: true
+        description: Length of the walk in whole minutes.
+        synonyms:
+          - synonym: walk length
+      - name: dog_ids
+        logicalType: array
+        physicalType: json
+        required: true
+        description: The dogs walked - one or more dog ids.
+        items:
+          logicalType: string
+          physicalType: uuid
+
+  - name: walk_cancelled_events
+    logicalType: object
+    physicalName: walk_cancelled_events
+    physicalType: table
+    description: One row per WalkCancelled event on walks.cancelled.v1.
+    relationships:
+      - id: cancellation_of_walk
+        from: walk_cancelled_events.walk_id
+        to: walk_scheduled_events.walk_id
+    properties:
+      - name: event_id
+        logicalType: string
+        physicalType: uuid
+        required: true
+        unique: true
+        primaryKey: true
+        description: CloudEvents envelope id - the dedupe key.
+      - name: event_type
+        logicalType: string
+        physicalType: text
+        required: true
+        description: CloudEvents type, e.g. com.hungovercoders.walks.cancelled.v1.
+      - name: event_source
+        logicalType: string
+        physicalType: text
+        required: true
+        description: CloudEvents source of the producing service.
+      - name: event_time
+        logicalType: date
+        physicalType: timestamp
+        required: true
+        description: CloudEvents envelope time.
+      - name: walk_id
+        logicalType: string
+        physicalType: uuid
+        required: true
+        unique: true
+      - name: walker_id
+        logicalType: string
+        physicalType: text
+        required: true
+        semanticType: dimension
+        description: The walker the walk belongs to, as the identity provider names them.
+      - name: scheduled_at
+        logicalType: date
+        physicalType: timestamp
+        required: true
+        semanticType: dimension
+        description: When the walk had been booked for.
+      - name: cancelled_at
+        logicalType: date
+        physicalType: timestamp
+        required: true
+        partitioned: true
+        semanticType: dimension
+      - name: reason
+        logicalType: string
+        physicalType: text
+        required: true
+        description: Why the walk was cancelled - a closed vocabulary.
+        enum:
+          - value: client_request
+            label: Client request
+            description: The client asked for the walk to be cancelled.
+          - value: walker_unavailable
+            label: Walker unavailable
+            description: The walker could not make the walk.
+          - value: bad_weather
+            label: Bad weather
+            description: The weather made the walk unsafe or unpleasant.
+          - value: dog_unwell
+            label: Dog unwell
+            description: One of the dogs was not well enough to walk.
+        quality:
+          - metric: invalidValues
+            description: Every reason is one of the declared values.
+            dimension: conformity
+            mustBe: 0
+
+slaProperties:
+  - property: latency
+    value: 15
+    unit: m
+
+team:
+  name: Dog Walking
+  description: Owns the Walk aggregate and everything published from it.
+  members:
+    - username: datagriff
+      role: owner
+
+support:
+  - channel: dataGriff/dog-walking-spec
+    tool: other
+    url: https://github.com/dataGriff/dog-walking-spec/issues

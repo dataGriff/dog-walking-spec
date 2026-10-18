@@ -1,0 +1,368 @@
+openapi: 3.1.0
+info:
+  title: Clients API
+  version: 1.0.0
+  description: >
+    The walker's roster: clients and the dogs that belong to them. Every
+    operation acts on behalf of the signed-in walker and only ever sees
+    that walker's records.
+  contact:
+    name: datagriff
+
+tags:
+  - name: clients
+    description: The people a walker walks for.
+  - name: dogs
+    description: The dogs a client owns.
+
+security:
+  - bearer_auth: []
+
+paths:
+  /clients:
+    get:
+      operationId: listClients
+      summary: List the walker's clients
+      description: Every client belonging to the signed-in walker, newest first.
+      tags: [clients]
+      responses:
+        '200':
+          description: The walker's clients.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+    post:
+      operationId: createClient
+      summary: Add a client
+      description: Adds a client to the signed-in walker's roster.
+      tags: [clients]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateClientRequest'
+      responses:
+        '201':
+          description: The client was added.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '400':
+          description: Invalid client - a blank name, or an email that is not an email address.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+
+  /clients/{client_id}:
+    parameters:
+      - name: client_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getClient
+      summary: Fetch a client
+      description: Returns one of the walker's clients by id.
+      tags: [clients]
+      responses:
+        '200':
+          description: The client.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/ClientNotFound'
+    patch:
+      operationId: updateClient
+      summary: Update a client
+      description: Changes the given fields of a client; fields left out are unchanged.
+      tags: [clients]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateClientRequest'
+      responses:
+        '200':
+          description: The updated client.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '400':
+          description: Invalid update - a blank name, or an email that is not an email address.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/ClientNotFound'
+    delete:
+      operationId: deleteClient
+      summary: Remove a client
+      description: >
+        Removes a client and every dog that belongs to them. Walks already
+        recorded against those dogs are history and are not touched.
+      tags: [clients]
+      responses:
+        '204':
+          description: The client and their dogs were removed.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/ClientNotFound'
+
+  /dogs:
+    get:
+      operationId: listDogs
+      summary: List the walker's dogs
+      description: Every dog across the walker's clients, optionally one client's.
+      tags: [dogs]
+      parameters:
+        - name: client_id
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+          description: Only the dogs belonging to this client.
+      responses:
+        '200':
+          description: The dogs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DogList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+    post:
+      operationId: createDog
+      summary: Add a dog
+      description: Adds a dog to one of the walker's clients.
+      tags: [dogs]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDogRequest'
+      responses:
+        '201':
+          description: The dog was added.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dog'
+        '400':
+          description: Invalid dog - a blank name, a date_of_birth in the future, or a client_id that is not one of the walker's clients.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+
+  /dogs/{dog_id}:
+    parameters:
+      - name: dog_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getDog
+      summary: Fetch a dog
+      description: Returns one of the walker's dogs by id.
+      tags: [dogs]
+      responses:
+        '200':
+          description: The dog.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dog'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/DogNotFound'
+    patch:
+      operationId: updateDog
+      summary: Update a dog
+      description: Changes the given fields of a dog; fields left out are unchanged. A dog cannot move between clients.
+      tags: [dogs]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDogRequest'
+      responses:
+        '200':
+          description: The updated dog.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dog'
+        '400':
+          description: Invalid update - a blank name or a date_of_birth in the future.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/DogNotFound'
+    delete:
+      operationId: deleteDog
+      summary: Remove a dog
+      description: Removes a dog. Walks already recorded against it are history and are not touched.
+      tags: [dogs]
+      responses:
+        '204':
+          description: The dog was removed.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/DogNotFound'
+
+components:
+  securitySchemes:
+    bearer_auth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        The signed-in walker's session token. Every record is scoped to the
+        walker the token identifies; a request without a valid token is a 401.
+
+  responses:
+    Unauthenticated:
+      description: No valid session token was presented.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    ClientNotFound:
+      description: No such client for this walker.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    DogNotFound:
+      description: No such dog for this walker.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+  schemas:
+    Problem:
+      type: object
+      required: [error_code, message]
+      additionalProperties: false
+      properties:
+        error_code:
+          type: string
+          description: Machine-readable reason, lower_snake_case (e.g. invalid_client, client_not_found, dog_not_found, unauthenticated).
+        message:
+          type: string
+          description: Human-readable explanation of the failure.
+
+    Client:
+      type: object
+      required: [client_id, name, created_at]
+      additionalProperties: false
+      properties:
+        client_id: { type: string, format: uuid }
+        name: { type: string, minLength: 1 }
+        email: { type: string, format: email }
+        phone: { type: string }
+        address: { type: string }
+        notes: { type: string }
+        created_at: { type: string, format: date-time }
+
+    ClientList:
+      type: object
+      required: [clients]
+      additionalProperties: false
+      properties:
+        clients:
+          type: array
+          items:
+            $ref: '#/components/schemas/Client'
+
+    CreateClientRequest:
+      type: object
+      required: [name]
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1 }
+        email: { type: string, format: email }
+        phone: { type: string }
+        address: { type: string }
+        notes: { type: string }
+
+    UpdateClientRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1 }
+        email: { type: string, format: email }
+        phone: { type: string }
+        address: { type: string }
+        notes: { type: string }
+
+    Dog:
+      type: object
+      required: [dog_id, client_id, name, created_at]
+      additionalProperties: false
+      properties:
+        dog_id: { type: string, format: uuid }
+        client_id: { type: string, format: uuid }
+        name: { type: string, minLength: 1 }
+        breed: { type: string }
+        date_of_birth: { type: string, format: date }
+        notes: { type: string }
+        created_at: { type: string, format: date-time }
+
+    DogList:
+      type: object
+      required: [dogs]
+      additionalProperties: false
+      properties:
+        dogs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Dog'
+
+    CreateDogRequest:
+      type: object
+      required: [client_id, name]
+      additionalProperties: false
+      properties:
+        client_id: { type: string, format: uuid }
+        name: { type: string, minLength: 1 }
+        breed: { type: string }
+        date_of_birth: { type: string, format: date }
+        notes: { type: string }
+
+    UpdateDogRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1 }
+        breed: { type: string }
+        date_of_birth: { type: string, format: date }
+        notes: { type: string }

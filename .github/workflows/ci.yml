@@ -1,0 +1,10 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    uses: hungovercoders/sysspec/.github/workflows/sysspec-ci.yml@v0
