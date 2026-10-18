@@ -51,6 +51,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WalkList'
+        '400':
+          description: >
+            Malformed filter - a scheduled_from or scheduled_to that is not a
+            date-time, or a status outside the declared statuses.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Problem'
         '401':
           $ref: '#/components/responses/Unauthenticated'
     post:
@@ -202,6 +210,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Walk'
+        '400':
+          description: Invalid completion - notes that are not text, or a body that is not JSON.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Problem'
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '404':

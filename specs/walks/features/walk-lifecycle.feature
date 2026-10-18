@@ -32,6 +32,12 @@ Feature: Walking, completing and cancelling walks
     And the walk carries a completed_at and the notes
     And a "WalkCompleted" event is guaranteed to be published for the walk
 
+  Scenario: Completion notes must be text
+    When the walk is completed with notes that are not text via completeWalk
+    Then the response status is 400
+    And the problem body carries an error_code and message
+    And the walk status is still "scheduled" when fetched via getWalk
+
   Scenario: A scheduled walk can be completed without being started
     When the walk is completed via completeWalk
     Then the response status is 200

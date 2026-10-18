@@ -70,6 +70,17 @@ Feature: Scheduling walks
     Then the response status is 200
     And the walks list carries the "Rex" walk but not the "Biscuit" walk
 
+  Scenario Outline: Walks are only listed for well-formed filters
+    When the walks are listed via listWalks with <filter>
+    Then the response status is 400
+    And the problem body carries an error_code and message
+
+    Examples:
+      | filter                                   |
+      | a scheduled_from that is not a date-time |
+      | a scheduled_to that is not a date-time   |
+      | a status outside the declared statuses   |
+
   Scenario: A scheduled walk is rescheduled in place
     Given the walker scheduled a walk for "Biscuit"
     When the walk's scheduled_at and duration_minutes are changed via updateWalk
