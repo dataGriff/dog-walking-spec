@@ -6,6 +6,9 @@ metadata:
 operations:
   'GET /clients':
     roster:
+      request:
+        headers:
+          Accept: application/json
       response:
         status: "200"
         mediaType: application/json
@@ -119,6 +122,9 @@ operations:
         status: "204"
   'GET /dogs':
     all_dogs:
+      request:
+        headers:
+          Accept: application/json
       response:
         status: "200"
         mediaType: application/json

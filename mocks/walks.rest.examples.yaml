@@ -6,6 +6,9 @@ metadata:
 operations:
   'GET /walks':
     upcoming:
+      request:
+        headers:
+          Accept: application/json
       response:
         status: "200"
         mediaType: application/json
