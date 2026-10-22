@@ -1,0 +1,31 @@
+apiVersion: sysspec/v1
+kind: Service
+name: clients
+title: Clients
+version: 1.0.0
+domain: Pet Care
+owner: datagriff
+implementationRepo: dataGriff/dog-walking-api
+summary: >
+  Owns the walker's roster: the Client aggregate and the Dog aggregate
+  that belongs to a client. Managed over HTTP; every record is scoped to
+  the signed-in walker and invisible to any other.
+
+artifacts:
+  - kind: openapi
+    path: openapi/clients.openapi.yaml
+    version: 1.0.0
+    gated: true
+    summary: Client and dog management API.
+
+  - kind: feature
+    path: features/manage-clients.feature
+    version: 1.0.0
+    gated: true
+    summary: Acceptance criteria for managing clients.
+
+  - kind: feature
+    path: features/manage-dogs.feature
+    version: 1.0.0
+    gated: true
+    summary: Acceptance criteria for managing a client's dogs.

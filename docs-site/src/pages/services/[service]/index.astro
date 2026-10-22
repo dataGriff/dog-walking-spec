@@ -1,0 +1,265 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import SystemGraph from '../../../components/SystemGraph';
+import {
+  artifactPage,
+  artifactUrl,
+  channelHref,
+  channelProducers,
+  edges,
+  KIND_LABELS,
+  services,
+  sortedArtifacts,
+  unconsumed,
+  withBase,
+} from '../../../lib/specs';
+import type { Artifact } from '../../../lib/specs';
+
+export function getStaticPaths() {
+  return services.map((s) => ({ params: { service: s.name }, props: { service: s } }));
+}
+
+const { service } = Astro.props;
+
+const FORMATS: Record<Artifact['kind'], string> = {
+  openapi: 'OpenAPI',
+  asyncapi: 'AsyncAPI',
+  'data-contract': 'ODCS',
+  feature: 'Gherkin',
+  doc: 'Markdown',
+};
+
+const cardTitle = (a: Artifact) => {
+  if (a.kind === 'data-contract') return a.odcs?.name ?? KIND_LABELS[a.kind];
+  if (a.kind === 'feature') return a.feature?.title ?? KIND_LABELS[a.kind];
+  if (a.kind === 'doc') return a.label ?? a.summary ?? a.stem;
+  return KIND_LABELS[a.kind];
+};
+
+const openapiPage = (() => {
+  const a = service.artifacts.find((x) => x.kind === 'openapi');
+  return a ? artifactPage(service.name, a) : null;
+})();
+const commands = service.operations.filter((o) => o.kind === 'command');
+const queries = service.operations.filter((o) => o.kind === 'query');
+const consumerLinks = (address: string) =>
+  services.filter((s) => s.consumes.includes(address));
+
+const hasSurface =
+  service.produces.length > 0 ||
+  service.consumes.length > 0 ||
+  service.operations.length > 0 ||
+  service.data_products.length > 0;
+const graphServices = services.map((s) => ({
+  name: s.name,
+  title: s.title,
+  domain: s.domain,
+  version: s.version,
+  operations: s.operations.map((o) => ({ op_id: o.op_id })),
+  data_products: s.data_products,
+}));
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+const pin = service.latest_release;
+---
+<StarlightPage frontmatter={{ title: service.title }}>
+  <p>
+    <strong>v{service.version ?? '—'}</strong> ·
+    {service.domain} · <code>{service.owner}</code>
+    {service.implementation_repo && (
+      <>
+        {' '}·{' '}
+        <a href={`https://github.com/${service.implementation_repo}`}>
+          {service.implementation_repo}
+        </a>
+      </>
+    )}
+  </p>
+  <p>{service.summary}</p>
+
+  {service.ahead && (
+    <p>
+      <span class="sc-chip sc-chip--gated">spec ahead of release</span>{' '}
+      This spec is at <strong>v{service.version}</strong>, ahead of the last
+      release{pin && <> (<code>{pin.tag}</code>)</>} — it is the surface the
+      next implementation change converges on.
+    </p>
+  )}
+
+  {hasSurface && (
+    <>
+      <h2>At a glance</h2>
+      <SystemGraph
+        client:only="react"
+        services={graphServices}
+        edges={edges}
+        unconsumed={unconsumed}
+        base={base}
+        focus={service.name}
+        height={380}
+      />
+    </>
+  )}
+
+  <h2>Artifacts</h2>
+  <div class="sc-artifacts">
+    {sortedArtifacts(service).map((a) => (
+      <div class={`sc-artifact-card sc-artifact-card--${a.kind}`}>
+        <span class="sc-artifact-kind">{FORMATS[a.kind]}</span>
+        <h3><a href={artifactPage(service.name, a)}>{cardTitle(a)}</a></h3>
+        <p>{a.summary}</p>
+        <span class="sc-artifact-meta">
+          {a.version && <span>v{a.version}</span>}
+          <span class={a.gated ? 'sc-chip sc-chip--gated' : 'sc-chip'}>
+            {a.gated ? 'gated' : 'context'}
+          </span>
+          <a class="sc-raw" href={artifactUrl(service.name, a)}>raw</a>
+        </span>
+      </div>
+    ))}
+  </div>
+
+  <h2>Drive an implementation</h2>
+  <p>
+    These specs are packaged for consumption — an implementation proves it
+    satisfies them; it never redefines them.
+    {service.implementation_repo && (
+      <>
+        {' '}Current implementation:{' '}
+        <a href={`https://github.com/${service.implementation_repo}`}>
+          {service.implementation_repo}
+        </a>.
+      </>
+    )}
+  </p>
+  {pin ? (
+    <>
+      <p>
+        Pin the released surface in a <code>contracts.lock</code> at the
+        implementation repo's root and fetch it read-only:
+      </p>
+      <pre><code>{`# contract pin - version is the specs release tag, sha its commit
+version: ${pin.tag}
+sha: ${pin.sha}`}</code></pre>
+      <p>
+        The full loop — fetch, strict binding, verification, staying
+        converged via Renovate — is on{' '}
+        <a href={withBase('/implementing/')}>Drive an implementation</a>.
+      </p>
+    </>
+  ) : (
+    <p>
+      No release tag yet — the first merge to main publishes
+      <code> {service.name}/v{service.version}</code> for implementations to
+      pin. The loop it feeds is on{' '}
+      <a href={withBase('/implementing/')}>Drive an implementation</a>.
+    </p>
+  )}
+
+  {commands.length > 0 && (
+    <>
+      <h2>Commands</h2>
+      <ul>
+        {commands.map((o) => (
+          <li>
+            {openapiPage ? (
+              <a href={openapiPage}><code>{o.op_id}</code></a>
+            ) : (
+              <code>{o.op_id}</code>
+            )}{' '}
+            — <code>{o.method} {o.path}</code>
+          </li>
+        ))}
+      </ul>
+    </>
+  )}
+  {queries.length > 0 && (
+    <>
+      <h2>Queries</h2>
+      <ul>
+        {queries.map((o) => (
+          <li>
+            {openapiPage ? (
+              <a href={openapiPage}><code>{o.op_id}</code></a>
+            ) : (
+              <code>{o.op_id}</code>
+            )}{' '}
+            — <code>{o.method} {o.path}</code>
+          </li>
+        ))}
+      </ul>
+    </>
+  )}
+
+  {service.produces.length > 0 && (
+    <>
+      <h2>Produces</h2>
+      <ul>
+        {service.produces.map((address) => {
+          const consuming = consumerLinks(address);
+          const href = channelHref(address);
+          return (
+            <li>
+              {href ? (
+                <a href={href}><code>{address}</code></a>
+              ) : (
+                <code>{address}</code>
+              )}
+              {consuming.length > 0 ? (
+                <>
+                  {' '}— consumed by{' '}
+                  {consuming.map((c, i) => (
+                    <>
+                      {i > 0 && ', '}
+                      <a href={withBase(`/services/${c.name}/`)}>{c.title}</a>
+                    </>
+                  ))}
+                </>
+              ) : (
+                <> — no consumer in the specs</>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  )}
+  {service.consumes.length > 0 && (
+    <>
+      <h2>Consumes</h2>
+      <ul>
+        {service.consumes.map((address) => {
+          const producer = channelProducers[address];
+          return (
+            <li>
+              {producer ? (
+                <>
+                  <a href={channelHref(address)}>
+                    <code>{address}</code>
+                  </a>{' '}
+                  — produced by{' '}
+                  <a href={withBase(`/services/${producer.name}/`)}>{producer.title}</a>
+                </>
+              ) : (
+                <code>{address}</code>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  )}
+
+  {service.data_products.length > 0 && (
+    <>
+      <h2>Data products</h2>
+      <ul>
+        {service.data_products.map((d) => (
+          <li>
+            <a href={withBase(`/services/${service.name}/${d.stem}/`)}>{d.title}</a>
+          </li>
+        ))}
+      </ul>
+    </>
+  )}
+</StarlightPage>

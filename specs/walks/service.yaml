@@ -1,0 +1,55 @@
+apiVersion: sysspec/v1
+kind: Service
+name: walks
+title: Walks
+version: 1.0.0
+domain: Pet Care
+owner: datagriff
+implementationRepo: dataGriff/dog-walking-api
+summary: >
+  Owns the Walk aggregate. Schedules walks for one or more of the walker's
+  dogs over HTTP, drives them through started, completed or cancelled, and
+  carries each lifecycle change as an event whose history is published as
+  a data contract.
+
+artifacts:
+  - kind: openapi
+    path: openapi/walks.openapi.yaml
+    version: 1.0.0
+    gated: true
+    summary: Walk scheduling and lifecycle API.
+
+  - kind: asyncapi
+    path: asyncapi/walks.asyncapi.yaml
+    version: 1.0.0
+    gated: true
+    summary: Walk lifecycle events.
+
+  - kind: feature
+    path: features/schedule-walks.feature
+    version: 1.0.0
+    gated: true
+    summary: Acceptance criteria for scheduling and finding walks.
+
+  - kind: feature
+    path: features/walk-lifecycle.feature
+    version: 1.0.0
+    gated: true
+    summary: Acceptance criteria for starting, completing and cancelling walks, and the events each guarantees.
+
+  - kind: data-contract
+    path: data-contracts/walks-events.odcs.yaml
+    version: 1.0.0
+    gated: true
+    summary: Append-only historical record of the walk lifecycle events.
+
+  - kind: doc
+    path: docs/adr-001-outbox.md
+    version: 1.0.0
+    gated: false
+    summary: Why a walk and its event are written together.
+
+produces:
+  - walks.scheduled.v1
+  - walks.completed.v1
+  - walks.cancelled.v1

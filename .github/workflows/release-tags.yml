@@ -1,0 +1,14 @@
+name: release-tags
+
+on:
+  push:
+    branches: [main]
+    paths: ["specs/**"]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    uses: hungovercoders/sysspec/.github/workflows/sysspec-release-tags.yml@v0

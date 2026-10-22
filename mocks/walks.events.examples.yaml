@@ -1,0 +1,68 @@
+apiVersion: mocks.microcks.io/v1alpha1
+kind: APIExamples
+metadata:
+  name: Walks
+  version: 1.0.0
+operations:
+  'SEND publishWalkScheduled':
+    scheduled:
+      eventMessage:
+        payload: |-
+          {
+            "specversion": "1.0",
+            "id": "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
+            "source": "/walks",
+            "type": "com.hungovercoders.walks.scheduled.v1",
+            "subject": "33333333-3333-4333-8333-333333333333",
+            "time": "2026-10-20T18:00:00Z",
+            "datacontenttype": "application/json",
+            "data": {
+              "walk_id": "33333333-3333-4333-8333-333333333333",
+              "walker_id": "user_2walkeranna",
+              "scheduled_at": "2026-11-02T09:00:00Z",
+              "duration_minutes": 45,
+              "dog_ids": ["22222222-2222-4222-8222-222222222222"]
+            }
+          }
+  'SEND publishWalkCompleted':
+    completed:
+      eventMessage:
+        payload: |-
+          {
+            "specversion": "1.0",
+            "id": "aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa",
+            "source": "/walks",
+            "type": "com.hungovercoders.walks.completed.v1",
+            "subject": "55555555-5555-4555-8555-555555555555",
+            "time": "2026-11-04T09:33:00Z",
+            "datacontenttype": "application/json",
+            "data": {
+              "walk_id": "55555555-5555-4555-8555-555555555555",
+              "walker_id": "user_2walkeranna",
+              "scheduled_at": "2026-11-04T09:00:00Z",
+              "started_at": "2026-11-04T09:01:00Z",
+              "completed_at": "2026-11-04T09:33:00Z",
+              "duration_minutes": 30,
+              "dog_ids": ["22222222-2222-4222-8222-222222222222"]
+            }
+          }
+  'SEND publishWalkCancelled':
+    cancelled:
+      eventMessage:
+        payload: |-
+          {
+            "specversion": "1.0",
+            "id": "aaaaaaaa-3333-4333-8333-aaaaaaaaaaaa",
+            "source": "/walks",
+            "type": "com.hungovercoders.walks.cancelled.v1",
+            "subject": "66666666-6666-4666-8666-666666666666",
+            "time": "2026-11-05T07:30:00Z",
+            "datacontenttype": "application/json",
+            "data": {
+              "walk_id": "66666666-6666-4666-8666-666666666666",
+              "walker_id": "user_2walkeranna",
+              "scheduled_at": "2026-11-05T09:00:00Z",
+              "cancelled_at": "2026-11-05T07:30:00Z",
+              "reason": "bad_weather"
+            }
+          }

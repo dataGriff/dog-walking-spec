@@ -1,0 +1,16 @@
+# The system this spec suite describes.
+apiVersion: sysspec/v1
+kind: System
+name: dog-walking
+title: Dog Walking
+domain: Pet Care
+# The reverse-DNS namespace every event type in this system is prefixed
+# with, e.g. com.hungovercoders.walks.scheduled.v1.
+org: com.hungovercoders
+summary: >
+  A solo dog walker's back office: the clients they walk for, the dogs
+  those clients own, and the walks they schedule, start, complete or
+  cancel. Clients and dogs are managed over HTTP; the walk lifecycle is
+  managed over HTTP and carried as events, with the historical record of
+  every walk published as a data contract. Every resource is scoped to
+  the signed-in walker.
