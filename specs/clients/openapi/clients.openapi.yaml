@@ -115,8 +115,10 @@ paths:
       operationId: deleteClient
       summary: Remove a client
       description: >
-        Removes a client and every dog that belongs to them. Walks already
-        recorded against those dogs are history and are not touched.
+        Removes a client and every dog that belongs to them. A client whose
+        dog is booked on an open walk (scheduled or in progress) is not
+        removed: complete or cancel that walk first. Closed walks are
+        history and are not touched.
       tags: [clients]
       responses:
         '204':
@@ -125,6 +127,8 @@ paths:
           $ref: '#/components/responses/Unauthenticated'
         '404':
           $ref: '#/components/responses/ClientNotFound'
+        '409':
+          $ref: '#/components/responses/DogHasOpenWalks'
 
   /dogs:
     get:
@@ -227,7 +231,10 @@ paths:
     delete:
       operationId: deleteDog
       summary: Remove a dog
-      description: Removes a dog. Walks already recorded against it are history and are not touched.
+      description: >
+        Removes a dog. A dog booked on an open walk (scheduled or in
+        progress) is not removed: complete or cancel that walk first. Closed
+        walks are history and are not touched.
       tags: [dogs]
       responses:
         '204':
@@ -236,6 +243,8 @@ paths:
           $ref: '#/components/responses/Unauthenticated'
         '404':
           $ref: '#/components/responses/DogNotFound'
+        '409':
+          $ref: '#/components/responses/DogHasOpenWalks'
 
 components:
   securitySchemes:
@@ -262,6 +271,12 @@ components:
             $ref: '#/components/schemas/Problem'
     DogNotFound:
       description: No such dog for this walker.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    DogHasOpenWalks:
+      description: A dog to be removed is booked on an open walk (error_code dog_has_open_walks).
       content:
         application/json:
           schema:
@@ -316,10 +331,17 @@ components:
 
     UpdateClientRequest:
       type: object
+      description: >
+        Fields left out are unchanged. An empty string clears an optional
+        field, which is then absent from the client.
       additionalProperties: false
       properties:
         name: { type: string, minLength: 1 }
-        email: { type: string, format: email }
+        email:
+          type: string
+          anyOf:
+            - { format: email }
+            - { maxLength: 0 }
         phone: { type: string }
         address: { type: string }
         notes: { type: string }
@@ -360,9 +382,16 @@ components:
 
     UpdateDogRequest:
       type: object
+      description: >
+        Fields left out are unchanged. An empty string clears an optional
+        field, which is then absent from the dog.
       additionalProperties: false
       properties:
         name: { type: string, minLength: 1 }
         breed: { type: string }
-        date_of_birth: { type: string, format: date }
+        date_of_birth:
+          type: string
+          anyOf:
+            - { format: date }
+            - { maxLength: 0 }
         notes: { type: string }

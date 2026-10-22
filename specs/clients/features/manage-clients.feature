@@ -46,6 +46,21 @@ Feature: Managing clients
     And fetching the client via getClient returns 404
     And fetching the dog via getDog returns 404
 
+  Scenario: A client's optional details can be cleared
+    Given the walker has a client "Alice Ahmed"
+    When the client's email is cleared with an empty string via updateClient
+    Then the response status is 200
+    And the client carries no email
+    And the client's name, phone, address and notes are unchanged
+
+  Scenario: A client whose dog has an open walk is not removed
+    Given the walker has a client "Alice Ahmed" with a dog "Biscuit"
+    And the walker has an open walk for "Biscuit"
+    When the client is removed via deleteClient
+    Then the response status is 409
+    And the problem body carries an error_code and message
+    And fetching the client via getClient returns 200
+
   Scenario: Fetching an unknown client returns 404
     When an unknown client_id is fetched via getClient
     Then the response status is 404

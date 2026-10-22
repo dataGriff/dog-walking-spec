@@ -356,6 +356,9 @@ components:
 
     UpdateWalkRequest:
       type: object
+      description: >
+        Fields left out are unchanged. An empty notes clears them, so they
+        are then absent from the walk.
       additionalProperties: false
       properties:
         scheduled_at: { type: string, format: date-time }

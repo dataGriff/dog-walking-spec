@@ -89,6 +89,12 @@ Feature: Scheduling walks
     And the walk's dog_ids and notes are unchanged
     And the walk status is still "scheduled"
 
+  Scenario: A scheduled walk's notes can be cleared
+    Given the walker scheduled a walk for "Biscuit"
+    When the walk's notes are cleared with an empty string via updateWalk
+    Then the response status is 200
+    And the walk carries no notes
+
   Scenario: A walk that has started cannot be amended
     Given the walker scheduled a walk for "Biscuit" and started it
     When the walk's duration_minutes is changed via updateWalk

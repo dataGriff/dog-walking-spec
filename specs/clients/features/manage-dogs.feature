@@ -50,6 +50,31 @@ Feature: Managing dogs
     Then the response status is 204
     And fetching the dog via getDog returns 404
 
+  Scenario: A dog's optional details can be cleared
+    Given the client has a dog "Biscuit"
+    When the dog's date_of_birth is cleared with an empty string via updateDog
+    Then the response status is 200
+    And the dog carries no date_of_birth
+    And the dog's name, breed, notes and client_id are unchanged
+
+  Scenario: A dog with an open walk is not removed
+    Given the client has a dog "Biscuit"
+    And the walker has an open walk for "Biscuit"
+    When the dog is removed via deleteDog
+    Then the response status is 409
+    And the problem body carries an error_code and message
+    And fetching the dog via getDog returns 200
+
+  Scenario: A dog whose walks are all closed can be removed
+    Given the client has a dog "Biscuit"
+    And the walker has a cancelled walk for "Biscuit"
+    When the dog is removed via deleteDog
+    Then the response status is 204
+
+  Scenario: A dog born today in the walker's time zone can be added
+    When the walker adds a dog for that client_id born on the date it already is in the furthest-ahead time zone via createDog
+    Then the response status is 201
+
   Scenario: Fetching an unknown dog returns 404
     When an unknown dog_id is fetched via getDog
     Then the response status is 404
